@@ -1,5 +1,5 @@
 name: "DinoAI PR Review"
-description: "Review a pull request with Paradime's DinoAI background agent — full repo, warehouse, dbt and lineage context — and post the findings as an inline PR review."
+description: "Review dbt pull requests with Paradime's DinoAI agent: warehouse and lineage aware inline PR reviews."
 author: "Paradime"
 branding:
   icon: "git-pull-request"
