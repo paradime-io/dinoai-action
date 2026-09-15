@@ -50,7 +50,8 @@ parses the findings block ──▶ POST /pulls/{n}/reviews with inline comments
 Three things worth knowing:
 
 - **The diff is never uploaded.** The action sends the base and head SHAs and a diffstat; the pod computes the diff itself with `git diff base...head` (three-dot — what GitHub shows). The payload is the same size for a 3-file PR and a 300-file PR.
-- **Re-runs are incremental.** On a new push the agent is told which commit it last reviewed and what it already reported, so it reviews the delta and says what's fixed instead of repeating itself. Set `incremental: "false"` to always review the whole PR.
+- **Re-runs are incremental.** On a new push the agent gets the exact changes since its last review (from GitHub's compare API), the list of what it already reported, and an instruction to re-read those files at head — so it reviews the delta and says what's fixed instead of repeating itself. Set `incremental: "false"` to always review the whole PR.
+- **The tree is verified.** The agent reports `git rev-parse HEAD` in its findings block. If that isn't the PR head, the review is posted with a warning and no inline findings rather than passing off a review of the wrong commit.
 - **The review is posted with your workflow token**, as `github-actions[bot]`. Paradime's GitHub App needs no extra permissions for this action to work.
 
 ## Customising the reviewer
@@ -104,7 +105,7 @@ The App needs only `Pull requests: Read & write` and `Contents: Read`, and no we
 
 ## Outputs
 
-`agent_session_id`, `status` (`completed`, `failed`, `expired`, `stopped`), `findings_count`, `structured` (whether a findings block was parsed), `review_body`.
+`agent_session_id`, `status` (`completed`, `failed`, `expired`, `stopped`), `findings_count`, `structured` (whether a findings block was parsed), `reviewed_head` (the commit the agent reported reviewing), `review_body`.
 
 ## Merge gating
 
