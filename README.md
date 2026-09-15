@@ -50,6 +50,7 @@ parses the findings block ──▶ POST /pulls/{n}/reviews with inline comments
 
 Three things worth knowing:
 
+- **The agent reviews the exact commit.** The trigger's `base_branch` accepts a branch, tag or commit SHA; the action passes the PR's **head SHA**, so the agent checks out precisely the tree under review — not wherever the branch has moved to by the time the pod starts.
 - **The diff is never uploaded.** The action sends the base and head SHAs and a diffstat; the pod computes the diff itself with `git diff base...head` (three-dot — what GitHub shows). The payload is the same size for a 3-file PR and a 300-file PR.
 - **Re-runs are incremental.** On a new push the agent gets the exact changes since its last review (from GitHub's compare API), the list of what it already reported, and an instruction to re-read those files at head — so it reviews the delta and says what's fixed instead of repeating itself. Set `incremental: "false"` to always review the whole PR.
 - **The tree is verified.** The agent reports `git rev-parse HEAD` in its findings block. If that isn't the PR head, the review is posted with a warning and no inline findings rather than passing off a review of the wrong commit.
