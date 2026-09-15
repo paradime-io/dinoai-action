@@ -150,10 +150,11 @@ def run() -> int:
         instructions=_input("instructions"),
     )
 
-    agent = ctx_mod.resolve_agent(gh, ctx, _input("agent", "pr-reviewer"))
-    if agent is None and _input("agent", "pr-reviewer"):
-        _notice(f"No .dinoai/agents/{_input('agent', 'pr-reviewer')}.yml on {ctx.default_branch or 'the default branch'}; "
-                "running the built-in reviewer. Add that file to customise it.")
+    # Paradime resolves the agent itself: the Agent Builder's specs live in the database and
+    # are matched by slug or, failing that, by name; agents written as YAML are read from the
+    # default branch. The action must not second-guess that — an earlier file-existence check
+    # here silently ignored every agent created in the app, which has no file in the repo.
+    agent = _input("agent") or None
 
     client = ParadimeClient(_input("api_endpoint"), _input("api_key"), _input("api_secret"), workspace_uid=_input("workspace_uid"))
     session_id, warning = client.trigger_run(
@@ -254,6 +255,7 @@ def run() -> int:
         session_id=session_id,
         session_url=session_url,
         structured=structured,
+        reviewed=state.status == "completed",
     )
     _set_output("findings_count", str(len(findings)))
     _set_output("review_body", body)

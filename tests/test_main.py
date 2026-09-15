@@ -26,10 +26,7 @@ class FakeGh:
         self.reviews_posted = []
         self.reviews = []
 
-    agent_files = set()
-
     def get_pull(self, repo, n): return PR
-    def file_exists(self, repo, path, ref): return (path, ref) in self.agent_files
     def compare(self, repo, base, head): return {"files": [{"filename": "m.sql", "additions": 1, "deletions": 1, "status": "modified", "patch": "@@ -2,1 +2,1 @@\n-old\n+new"}]}
     def list_pull_files(self, repo, n): return [{"filename": "m.sql", "additions": 1, "deletions": 0, "status": "modified", "patch": PATCH}]
     def list_reviews(self, repo, n): return self.reviews
@@ -106,7 +103,7 @@ class RunTest(unittest.TestCase):
         code, gh, pd = self._run()
         self.assertEqual(code, 0)
         self.assertEqual(pd.trigger_kwargs["base_branch"], "c" * 40)
-        self.assertIsNone(pd.trigger_kwargs["agent"])  # no definition file → unnamed run
+        self.assertIsNone(pd.trigger_kwargs["agent"])  # agent input empty → built-in reviewer
         self.assertIn("git diff " + "b" * 40 + "..." + "c" * 40, pd.trigger_kwargs["message"])
         self.assertEqual(len(gh.reviews_posted), 1)
         review = gh.reviews_posted[0]
@@ -123,10 +120,12 @@ class RunTest(unittest.TestCase):
         self.assertIn("\n2\n", raw)
         self.assertFalse(pd.stopped)
 
-    def test_named_agent_when_definition_exists_on_default_branch(self):
-        with mock.patch.object(FakeGh, "agent_files", {(".dinoai/agents/pr-reviewer.yml", "main")}):
-            _, _, pd = self._run()
-        self.assertEqual(pd.trigger_kwargs["agent"], "pr-reviewer")
+    def test_agent_is_passed_through_untouched(self):
+        """Paradime resolves the agent (DB by slug or name, else repo YAML); we never pre-check."""
+        for value in ("pr-reviewer", "My PR Reviewer", "team-a/reviewer"):
+            with self.subTest(value=value):
+                _, _, pd = self._run({"INPUT_AGENT": value})
+                self.assertEqual(pd.trigger_kwargs["agent"], value)
 
     def test_fail_on_findings_requests_changes_and_fails(self):
         code, gh, _ = self._run({"INPUT_FAIL_ON_FINDINGS": "true"})
