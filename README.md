@@ -1,0 +1,121 @@
+# DinoAI PR Review — GitHub Action
+
+Review pull requests with [Paradime](https://www.paradime.io)'s DinoAI background agent and get the findings back as an inline PR review.
+
+The agent does not run in your CI runner. It runs in your Paradime workspace, with the repository checked out at the PR's head commit **and** everything else the workspace already has: your warehouse connection, dbt, the catalog, column-level lineage and Bolt run history. So it can answer the questions a diff can't — does this join fan out, what breaks three models downstream, is the new column mostly null in production — and it posts the answer where the code is.
+
+## Quick start
+
+1. In Paradime, create a workspace API key with the `dinoai:agent:trigger` and `dinoai:agent:read` capabilities. Note the API endpoint shown next to it.
+2. Add `PARADIME_API_ENDPOINT` and `PARADIME_API_KEY` as repository secrets.
+3. Add a workflow:
+
+```yaml
+name: DinoAI PR review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: paradime-io/dinoai-action@v1
+        with:
+          api_endpoint: ${{ secrets.PARADIME_API_ENDPOINT }}
+          api_key: ${{ secrets.PARADIME_API_KEY }}
+```
+
+Open a PR that touches your dbt project. A review appears when the agent finishes.
+
+See [`examples/`](examples/) for the mention-driven variant (`@dinoai <question>` in a PR comment).
+
+## How it works
+
+```
+pull_request event ──▶ action builds a context block ──▶ triggerDinoaiAgentRun(base_branch = head SHA)
+                        (coordinates + diffstat,                     │
+                         PR comments, prior findings)                ▼
+                                                        agent pod: full clone, checks out head SHA,
+                                                        git diff base...head, dbt, warehouse, lineage
+                                                                     │
+action polls dinoaiAgentRun ◀────────────────────────────────────────┘
+        │
+        ▼
+parses the findings block ──▶ POST /pulls/{n}/reviews with inline comments (your GITHUB_TOKEN)
+```
+
+Three things worth knowing:
+
+- **The diff is never uploaded.** The action sends the base and head SHAs and a diffstat; the pod computes the diff itself with `git diff base...head` (three-dot — what GitHub shows). The payload is the same size for a 3-file PR and a 300-file PR.
+- **Re-runs are incremental.** On a new push the agent is told which commit it last reviewed and what it already reported, so it reviews the delta and says what's fixed instead of repeating itself. Set `incremental: "false"` to always review the whole PR.
+- **The review is posted with your workflow token**, as `github-actions[bot]`. Paradime's GitHub App needs no extra permissions for this action to work.
+
+## Customising the reviewer
+
+The action runs the agent named by `agent` (default `pr-reviewer`), defined in `.dinoai/agents/pr-reviewer.yml` **on your default branch**. If the file is absent a built-in reviewer is used. The definition is read from the default branch on purpose: a PR cannot rewrite the reviewer that reviews it.
+
+The agent also honours rule files it finds in the checkout — `.dinorules`, `CLAUDE.md`, `AGENTS.md`, `.cursorrules` and `.cursor/rules/**`.
+
+Use `instructions` for per-workflow focus without touching the agent definition.
+
+## Inputs
+
+| Input | Default | Notes |
+|---|---|---|
+| `api_endpoint` | — | Paradime API endpoint (GraphQL URL). Required. |
+| `api_key` | — | Workspace API key (`prdm_wsp_…`). Required. |
+| `api_secret` | `""` | Only for legacy key/secret pairs. |
+| `github_token` | `${{ github.token }}` | Needs `pull-requests: write` to post. |
+| `agent` | `pr-reviewer` | Agent definition name. |
+| `instructions` | `""` | Extra instructions appended to the prompt. |
+| `model_family` | `""` | A model family enabled in your workspace. |
+| `mode` | `review` | `review` for `pull_request` events, `mention` for comment events. |
+| `trigger_phrase` | `@dinoai` | Phrase that triggers a run in `mention` mode. |
+| `post_review` | `true` | Set `false` to only expose outputs. |
+| `fail_on_findings` | `false` | Posts `REQUEST_CHANGES` and fails the step when findings exist. |
+| `max_findings` | `25` | Inline comments per review; the rest go in the summary. |
+| `incremental` | `true` | Review only what changed since the last review. |
+| `review_drafts` | `false` | Review draft PRs. |
+| `timeout_minutes` | `30` | Stop the run and fail after this long. |
+| `poll_interval_seconds` | `10` | Polling cadence. |
+| `session_url_template` | `""` | Footer link; `{agent_session_id}` is substituted. |
+
+## Outputs
+
+`agent_session_id`, `status` (`completed`, `failed`, `expired`, `stopped`), `findings_count`, `review_body`.
+
+## Merge gating
+
+Set `fail_on_findings: "true"` and make the job a required status check. The review is then posted as `REQUEST_CHANGES` when there are findings. The action never posts `APPROVE` — a bot approval satisfying a required-reviewer rule would be a policy hole.
+
+## Limitations
+
+- **Fork PRs are not reviewed.** The agent reviews the base repository's clone, where a fork's commits don't exist — and GitHub doesn't expose secrets to fork PRs anyway. The action skips with a warning (or fails, if `fail_on_findings` is set).
+- **Cancellation.** Cancelling the workflow sends the step a signal; the action stops the agent session on the way out. If the runner itself dies, the session is released by Paradime's inactivity timeout.
+- **GitHub Enterprise Server** is supported through the runner's `GITHUB_API_URL`.
+- Only lines that are part of the diff can carry an inline comment (a GitHub rule). Findings on other lines are listed in the review summary instead.
+
+## The findings contract
+
+The agent is asked to end its final message with a fenced `dinoai-findings` JSON block:
+
+```json
+{"summary": "…", "findings": [{"path": "models/marts/orders.sql", "line": 42, "severity": "high", "title": "…", "body": "…", "suggestion": "…"}]}
+```
+
+`suggestion` becomes a GitHub suggestion block (one-click apply). If the agent returns no block, its whole message is posted as the summary.
+
+## Development
+
+Stdlib-only Python; no build step, nothing to bundle.
+
+```
+python -m unittest discover -s tests -v
+```
+
+## License
+
+MIT

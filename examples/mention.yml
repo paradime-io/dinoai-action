@@ -1,0 +1,24 @@
+name: DinoAI on mention
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dinoai:
+    # Cheap pre-filter so the job doesn't even start for unrelated comments.
+    if: contains(github.event.comment.body, '@dinoai')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: paradime-io/dinoai-action@v1
+        with:
+          api_endpoint: ${{ secrets.PARADIME_API_ENDPOINT }}
+          api_key: ${{ secrets.PARADIME_API_KEY }}
+          mode: mention
+          trigger_phrase: "@dinoai"

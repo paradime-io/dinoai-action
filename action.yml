@@ -1,0 +1,114 @@
+name: "DinoAI PR Review"
+description: "Review a pull request with Paradime's DinoAI background agent — full repo, warehouse, dbt and lineage context — and post the findings as an inline PR review."
+author: "Paradime"
+branding:
+  icon: "git-pull-request"
+  color: "purple"
+
+inputs:
+  api_endpoint:
+    description: "Paradime API endpoint (Settings → API keys). A GraphQL URL."
+    required: true
+  api_key:
+    description: "Paradime workspace API key. A `prdm_wsp_…` bearer token, or the legacy key when `api_secret` is also set. Needs `dinoai:agent:trigger` and `dinoai:agent:read`."
+    required: true
+  api_secret:
+    description: "Legacy API secret. Only set this for key/secret pairs; leave empty for bearer tokens."
+    required: false
+    default: ""
+  github_token:
+    description: "Token used to read the PR and post the review. The default workflow token is enough."
+    required: false
+    default: ${{ github.token }}
+  agent:
+    description: "Agent definition to run, from `.dinoai/agents/<name>.yml` on the default branch. A built-in reviewer is used if the file is absent."
+    required: false
+    default: "pr-reviewer"
+  instructions:
+    description: "Extra instructions appended to the review prompt (e.g. what to focus on)."
+    required: false
+    default: ""
+  model_family:
+    description: "Model family to run with, as configured in your workspace. Leave empty for the workspace default."
+    required: false
+    default: ""
+  mode:
+    description: "`review` runs on pull_request events. `mention` runs on issue_comment / pull_request_review_comment events whose body contains `trigger_phrase`."
+    required: false
+    default: "review"
+  trigger_phrase:
+    description: "Phrase that triggers a run in `mention` mode."
+    required: false
+    default: "@dinoai"
+  post_review:
+    description: "Post the result to the PR as a review. Set to false to only expose it as outputs."
+    required: false
+    default: "true"
+  fail_on_findings:
+    description: "Post the review as REQUEST_CHANGES and fail the step when the agent reports findings."
+    required: false
+    default: "false"
+  max_findings:
+    description: "Maximum inline comments per review; the rest go into the summary."
+    required: false
+    default: "25"
+  incremental:
+    description: "On a re-run for the same PR, ask the agent to review only what changed since its last review."
+    required: false
+    default: "true"
+  review_drafts:
+    description: "Review draft pull requests."
+    required: false
+    default: "false"
+  timeout_minutes:
+    description: "Give up and stop the agent run after this long."
+    required: false
+    default: "30"
+  poll_interval_seconds:
+    description: "How often to poll the run for progress."
+    required: false
+    default: "10"
+  session_url_template:
+    description: "Optional link template for the review footer. `{agent_session_id}` is substituted."
+    required: false
+    default: ""
+
+outputs:
+  agent_session_id:
+    description: "The DinoAI agent session that produced the review."
+    value: ${{ steps.run.outputs.agent_session_id }}
+  status:
+    description: "Terminal status of the run: completed, failed, expired or stopped."
+    value: ${{ steps.run.outputs.status }}
+  findings_count:
+    description: "Number of findings the agent reported."
+    value: ${{ steps.run.outputs.findings_count }}
+  review_body:
+    description: "The review summary the agent wrote (markdown)."
+    value: ${{ steps.run.outputs.review_body }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: run
+      shell: bash
+      env:
+        INPUT_API_ENDPOINT: ${{ inputs.api_endpoint }}
+        INPUT_API_KEY: ${{ inputs.api_key }}
+        INPUT_API_SECRET: ${{ inputs.api_secret }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}
+        INPUT_AGENT: ${{ inputs.agent }}
+        INPUT_INSTRUCTIONS: ${{ inputs.instructions }}
+        INPUT_MODEL_FAMILY: ${{ inputs.model_family }}
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_TRIGGER_PHRASE: ${{ inputs.trigger_phrase }}
+        INPUT_POST_REVIEW: ${{ inputs.post_review }}
+        INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail_on_findings }}
+        INPUT_MAX_FINDINGS: ${{ inputs.max_findings }}
+        INPUT_INCREMENTAL: ${{ inputs.incremental }}
+        INPUT_REVIEW_DRAFTS: ${{ inputs.review_drafts }}
+        INPUT_TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+        INPUT_POLL_INTERVAL_SECONDS: ${{ inputs.poll_interval_seconds }}
+        INPUT_SESSION_URL_TEMPLATE: ${{ inputs.session_url_template }}
+        PYTHONPATH: ${{ github.action_path }}
+      run: python3 -m dinoai_action.main

@@ -1,0 +1,26 @@
+name: DinoAI PR review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Reviews run in Paradime, not in this runner: the job only needs to read the PR and post the review.
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: dinoai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: paradime-io/dinoai-action@v1
+        with:
+          api_endpoint: ${{ secrets.PARADIME_API_ENDPOINT }}
+          api_key: ${{ secrets.PARADIME_API_KEY }}
+          # agent: pr-reviewer            # .dinoai/agents/pr-reviewer.yml on your default branch
+          # model_family: standard        # any family enabled in your workspace
+          # fail_on_findings: "true"      # make this a merge gate
