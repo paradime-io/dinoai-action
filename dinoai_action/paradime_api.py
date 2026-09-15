@@ -57,7 +57,7 @@ class RunState:
 
 
 class ParadimeClient:
-    def __init__(self, endpoint: str, api_key: str, api_secret: str = "", *, retries: int = 3):
+    def __init__(self, endpoint: str, api_key: str, api_secret: str = "", *, workspace_uid: str = "", retries: int = 3):
         if not endpoint.startswith("https://"):
             raise ParadimeApiError("api_endpoint must be an https:// URL")
         self.endpoint = endpoint
@@ -68,6 +68,12 @@ class ParadimeClient:
             self._headers = {"X-API-KEY": api_key, "X-API-SECRET": api_secret}
         else:
             self._headers = {"Authorization": f"Bearer {api_key}"}
+        # Workspace keys are bound to one workspace. Company keys (prdm_cmp_…) span several and
+        # must name the target on every request.
+        if workspace_uid:
+            self._headers["X-Paradime-Workspace"] = workspace_uid
+        elif api_key.startswith("prdm_cmp_"):
+            raise ParadimeApiError("A company API key (prdm_cmp_…) needs `workspace_uid` to say which workspace to run in.")
 
     def _gql(self, query: str, variables: dict) -> dict:
         body = json.dumps({"query": query, "variables": variables}).encode()

@@ -6,7 +6,7 @@ The agent does not run in your CI runner. It runs in your Paradime workspace, wi
 
 ## Quick start
 
-1. In Paradime, create a workspace API key with the `dinoai:agent:trigger` and `dinoai:agent:read` capabilities. Note the API endpoint shown next to it.
+1. In Paradime, create a workspace API key with the `dinoai:agent:trigger` and `dinoai:agent:read` capabilities. Note the API endpoint shown next to it. (A company-level key works too — then also pass `workspace_uid`.)
 2. Add `PARADIME_API_ENDPOINT` and `PARADIME_API_KEY` as repository secrets.
 3. Add a workflow:
 
@@ -88,6 +88,7 @@ The App needs only `Pull requests: Read & write` and `Contents: Read`, and no we
 | `api_endpoint` | — | Paradime API endpoint (GraphQL URL). Required. |
 | `api_key` | — | Workspace API key (`prdm_wsp_…`). Required. |
 | `api_secret` | `""` | Only for legacy key/secret pairs. |
+| `workspace_uid` | `""` | Required with a company key (`prdm_cmp_…`). Workspace keys already know their workspace. |
 | `github_token` | `${{ github.token }}` | Needs `pull-requests: write` to post. |
 | `agent` | `pr-reviewer` | Agent definition name. |
 | `instructions` | `""` | Extra instructions appended to the prompt. |
