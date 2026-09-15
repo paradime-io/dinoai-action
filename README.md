@@ -61,6 +61,25 @@ The agent also honours rule files it finds in the checkout — `.dinorules`, `CL
 
 Use `instructions` for per-workflow focus without touching the agent definition.
 
+## Posting as "DinoAI" instead of github-actions[bot]
+
+The review is authored by whichever token posts it. The default `${{ github.token }}` shows as **github-actions[bot]**. To have reviews appear under a DinoAI identity with its own name and avatar, install a GitHub App for it and mint a token in the workflow — no user account or seat needed:
+
+```yaml
+      - uses: actions/create-github-app-token@v1
+        id: app
+        with:
+          app-id: ${{ vars.DINOAI_APP_ID }}
+          private-key: ${{ secrets.DINOAI_APP_PRIVATE_KEY }}
+      - uses: paradime-io/dinoai-action@v1
+        with:
+          api_endpoint: ${{ secrets.PARADIME_API_ENDPOINT }}
+          api_key: ${{ secrets.PARADIME_API_KEY }}
+          github_token: ${{ steps.app.outputs.token }}
+```
+
+The App needs only `Pull requests: Read & write` and `Contents: Read`, and no webhooks. Incremental re-review keys on a marker in the review body, not on the author, so switching identities mid-PR is safe.
+
 ## Inputs
 
 | Input | Default | Notes |
@@ -85,7 +104,7 @@ Use `instructions` for per-workflow focus without touching the agent definition.
 
 ## Outputs
 
-`agent_session_id`, `status` (`completed`, `failed`, `expired`, `stopped`), `findings_count`, `review_body`.
+`agent_session_id`, `status` (`completed`, `failed`, `expired`, `stopped`), `findings_count`, `structured` (whether a findings block was parsed), `review_body`.
 
 ## Merge gating
 
@@ -106,7 +125,7 @@ The agent is asked to end its final message with a fenced `dinoai-findings` JSON
 {"summary": "…", "findings": [{"path": "models/marts/orders.sql", "line": 42, "severity": "high", "title": "…", "body": "…", "suggestion": "…"}]}
 ```
 
-`suggestion` becomes a GitHub suggestion block (one-click apply). If the agent returns no block, its whole message is posted as the summary.
+`suggestion` becomes a GitHub suggestion block (one-click apply). The contract opens the prompt, and if the agent still finishes without the block the action sends one follow-up on the same session asking for just the JSON before posting. If that also yields nothing, the message is posted as the summary and `structured` is `false`.
 
 ## Development
 
