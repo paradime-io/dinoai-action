@@ -26,6 +26,12 @@ query Read($id: String!) {
 }
 """
 
+_SEND = """
+mutation Send($id: String!, $message: String!) {
+  sendDinoaiAgentMessage(agentSessionId: $id, message: $message) { ok status }
+}
+"""
+
 _STOP = """
 mutation Stop($id: String!) {
   stopDinoaiAgentRun(agentSessionId: $id) { ok status }
@@ -119,6 +125,9 @@ class ParadimeClient:
         # The status is a GraphQL enum, so it comes back as the member name. Normalise once here.
         status = str(result.get("status") or "queued").lower()
         return RunState(status=status, messages=list(result.get("messages") or []))
+
+    def send_message(self, session_id: str, message: str) -> None:
+        self._gql(_SEND, {"id": session_id, "message": message})
 
     def stop_run(self, session_id: str) -> None:
         self._gql(_STOP, {"id": session_id})

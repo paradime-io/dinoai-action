@@ -53,6 +53,18 @@ def parse_findings(text: str) -> tuple[str, list[Finding], bool]:
     return text.strip(), [], False
 
 
+def parse_findings_from_messages(texts: list[str]) -> tuple[str, list[Finding], bool]:
+    """Like parse_findings, but looks through every agent message, newest first, for the block.
+
+    The summary falls back to the newest message when no block exists anywhere.
+    """
+    for text in reversed(texts):
+        summary, findings, structured = parse_findings(text)
+        if structured:
+            return summary, findings, True
+    return (texts[-1].strip() if texts else ""), [], False
+
+
 def _coerce(item: object) -> Finding | None:
     if not isinstance(item, dict):
         return None
@@ -142,9 +154,13 @@ def render_review_body(
     head_sha: str,
     session_id: str,
     session_url: str | None,
+    structured: bool = True,
 ) -> str:
     total = inline_count + len(overflow)
-    heading = "### DinoAI review" + (f" — {total} finding{'s' if total != 1 else ''}" if total else " — no findings")
+    if not structured:
+        heading = "### DinoAI review"
+    else:
+        heading = "### DinoAI review" + (f" — {total} finding{'s' if total != 1 else ''}" if total else " — no findings")
     parts = [heading, summary or "_The agent returned no summary._"]
     if overflow:
         parts.append("#### Further findings")

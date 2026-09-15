@@ -2,6 +2,7 @@ import unittest
 
 from dinoai_action.findings import (
     Finding,
+    parse_findings_from_messages,
     commentable_lines,
     find_previous_reviews,
     parse_findings,
@@ -60,6 +61,19 @@ class ParseFindingsTest(unittest.TestCase):
         text = 'Prose summary here.\n```json\n{"findings": []}\n```'
         summary, _, _ = parse_findings(text)
         self.assertEqual(summary, "Prose summary here.")
+
+
+class ParseAcrossMessagesTest(unittest.TestCase):
+    def test_block_in_earlier_message_is_found(self):
+        texts = ['```json\n{"summary": "s", "findings": []}\n```', "Done, see above."]
+        summary, findings, structured = parse_findings_from_messages(texts)
+        self.assertTrue(structured)
+        self.assertEqual(summary, "s")
+
+    def test_no_block_anywhere_uses_last_message(self):
+        summary, findings, structured = parse_findings_from_messages(["first", "last prose"])
+        self.assertFalse(structured)
+        self.assertEqual(summary, "last prose")
 
 
 class CommentableLinesTest(unittest.TestCase):

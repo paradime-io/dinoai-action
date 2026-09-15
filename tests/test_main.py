@@ -56,6 +56,7 @@ class FakeParadime:
         return RunState(status="completed", messages=[{"role": "agent", "content": "looking…"}, {"role": "agent", "content": FINAL}])
 
     def stop_run(self, sid): self.stopped = True
+    def send_message(self, sid, msg): self.sent = getattr(self, "sent", []) + [msg]
 
 
 class RunTest(unittest.TestCase):
@@ -163,3 +164,25 @@ class RunTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FollowUpTest(RunTest):
+    """When the final message has no block, one follow-up on the same session should fetch it."""
+
+    def test_follow_up_recovers_block(self):
+        class Prose(FakeParadime):
+            def read_run(self, sid):
+                self.polls += 1
+                if self.polls == 1:
+                    return RunState(status="completed", messages=[{"role": "agent", "content": "Prose only, findings below."}])
+                return RunState(status="completed", messages=[{"role": "agent", "content": "Prose only, findings below."},
+                                                              {"role": "agent", "content": FINAL}])
+        with mock.patch.object(main, "ParadimeClient", Prose), mock.patch.object(main.time, "sleep", lambda *_: None), \
+             mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(main, "GitHubClient", lambda *a, **k: FakeGh()):
+            code = main.run()
+        self.assertEqual(code, 0)
+        pd = FakeParadime.instances[-1]
+        self.assertEqual(len(pd.sent), 1)
+        raw = open(self.out).read()
+        self.assertIn("structured", raw)
+        self.assertIn("\n2\n", raw)  # both findings parsed from the follow-up

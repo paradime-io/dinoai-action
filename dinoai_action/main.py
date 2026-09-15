@@ -13,7 +13,7 @@ from . import context as ctx_mod
 from .findings import (
     commentable_lines,
     find_previous_reviews,
-    parse_findings,
+    parse_findings_from_messages,
     partition,
     render_comment,
     render_review_body,
@@ -199,13 +199,23 @@ def run() -> int:
     _set_output("status", state.status)
 
     agent_texts = state.agent_messages()
-    final_text = agent_texts[-1] if agent_texts else ""
-    summary, findings, structured = parse_findings(final_text)
+    summary, findings, structured = parse_findings_from_messages(agent_texts)
+    if state.status == "completed" and not structured and agent_texts:
+        # The model wrote prose and skipped the block. One short follow-up on the same session is
+        # far cheaper than a fresh run and almost always yields it.
+        _log("No findings block in the reply; asking the agent for it.")
+        follow_up = _ask_for_findings_block(client, session_id, already_seen=len(state.messages), deadline=deadline)
+        if follow_up is not None:
+            state = follow_up
+            summary_2, findings_2, structured_2 = parse_findings_from_messages(state.agent_messages())
+            if structured_2:
+                summary, findings, structured = (summary_2 or summary), findings_2, True
     if state.status != "completed":
         summary = f"The review run ended with status `{state.status}`." + (f"\n\n{summary}" if summary else "")
         findings = []
     elif not structured:
         _warn("The agent did not return a structured findings block; posting its message as the summary only.")
+    _set_output("structured", "true" if structured else "false")
 
     inline, overflow = partition(findings, commentable_lines(files), _int("max_findings", 25))
     session_url = _input("session_url_template").replace("{agent_session_id}", session_id) or None
@@ -217,6 +227,7 @@ def run() -> int:
         head_sha=ctx.head_sha,
         session_id=session_id,
         session_url=session_url,
+        structured=structured,
     )
     _set_output("findings_count", str(len(findings)))
     _set_output("review_body", body)
@@ -240,6 +251,30 @@ def run() -> int:
         _error(f"{len(findings)} finding(s) reported and fail_on_findings is set")
         return 1
     return 0
+
+
+def _ask_for_findings_block(client: ParadimeClient, session_id: str, *, already_seen: int, deadline: float):
+    """Send one follow-up asking only for the block; return the new RunState or None on timeout."""
+    try:
+        client.send_message(
+            session_id,
+            "Return ONLY the `dinoai-findings` fenced JSON block for the review you just completed — "
+            "no prose before or after it. Include every finding you identified, with path and head-commit line numbers.",
+        )
+    except ParadimeApiError as e:
+        _warn(f"Could not send the follow-up: {e}")
+        return None
+    interval = max(3, _int("poll_interval_seconds", 10))
+    budget_end = min(deadline, time.monotonic() + 240)
+    while time.monotonic() < budget_end:
+        time.sleep(interval)
+        state = client.read_run(session_id)
+        if len(state.messages) > already_seen and state.is_terminal:
+            for m in state.messages[already_seen:]:
+                _log(f"[{m.get('role', '?')}] {str(m.get('content', '')).strip()[:2000]}")
+            return state
+    _warn("The follow-up did not produce a findings block in time.")
+    return None
 
 
 def _post_review(gh: GitHubClient, ctx: ctx_mod.PullRequestContext, *, body: str, event: str, comments: list[dict]) -> None:

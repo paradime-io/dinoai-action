@@ -86,6 +86,9 @@ outputs:
   review_body:
     description: "The review summary the agent wrote (markdown)."
     value: ${{ steps.run.outputs.review_body }}
+  structured:
+    description: "Whether the agent returned a parseable findings block (true/false)."
+    value: ${{ steps.run.outputs.structured }}
 
 runs:
   using: "composite"
