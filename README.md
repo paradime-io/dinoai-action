@@ -6,7 +6,7 @@ The agent does not run in your CI runner. It runs in your Paradime workspace, wi
 
 ## Quick start
 
-1. In Paradime, **Settings → API Keys → Generate API Key** with the **DinoAI agent API** capability. Note the endpoint shown with it (`https://api.paradime.io/api/v1/<company_token>/graphql`) and the workspace token of the workspace connected to this repository.
+1. In Paradime, **Settings → API Keys → Generate API Key** with the **DinoAI agent API** capability ([docs](https://docs.paradime.io/developers/api-keys)). Note the endpoint shown with it (`https://api.paradime.io/api/v1/<company_token>/graphql`) and the workspace token of the workspace connected to this repository.
 2. Add `PARADIME_API_ENDPOINT` and `PARADIME_API_KEY` as secrets (organisation-level works — one key can serve every repository), and `PARADIME_WORKSPACE_UID` as a repository variable.
 3. Add a workflow:
 
@@ -85,12 +85,16 @@ The review is authored by whichever token posts it. The default `${{ github.toke
         with:
           api_endpoint: ${{ secrets.PARADIME_API_ENDPOINT }}
           api_key: ${{ secrets.PARADIME_API_KEY }}
+          workspace_uid: ${{ vars.PARADIME_WORKSPACE_UID }}
           github_token: ${{ steps.app.outputs.token }}
 ```
 
 The App needs only `Pull requests: Read & write` and `Contents: Read`, and no webhooks. Incremental re-review keys on a marker in the review body, not on the author, so switching identities mid-PR is safe.
 
 ## Inputs
+
+Credentials follow [Paradime's API keys guide](https://docs.paradime.io/developers/api-keys): an Account API key as a bearer token, plus the workspace token per request.
+
 
 | Input | Default | Notes |
 |---|---|---|
