@@ -25,7 +25,7 @@ inputs:
     required: false
     default: ${{ github.token }}
   agent:
-    description: "Name of the Programmable Agent to run (see https://docs.paradime.io/products/dino-ai/programmable-agents). Must exist on the repository's default branch; the built-in reviewer runs if it doesn't. Set to empty to always use the built-in reviewer."
+    description: "Slug of the Programmable Agent to run, e.g. pr-reviewer (see https://docs.paradime.io/products/dino-ai/programmable-agents). The slug is the immutable key minted from the agent name, not the display name. Must exist on the repository's default branch; the built-in reviewer runs if it doesn't. Set to empty to always use the built-in reviewer."
     required: false
     default: "pr-reviewer"
   instructions:
