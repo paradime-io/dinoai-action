@@ -65,11 +65,16 @@ Workspace key/secret pairs (`X-API-KEY` / `X-API-SECRET`) still work: pass the k
 
 ## Customising the reviewer
 
-The action runs the agent named by `agent` (default `pr-reviewer`), defined in `.dinoai/agents/pr-reviewer.yml` **on your default branch**. If that file doesn't exist the action says so in the log and runs an unnamed session with the built-in review prompt, so nothing breaks before you've written one. The action checks for the file on the default branch on purpose: a PR cannot supply the reviewer that reviews it.
+The action runs the [Programmable Agent](https://docs.paradime.io/products/dino-ai/programmable-agents) named by `agent` (default `pr-reviewer`), so the reviewer's role, instructions, tools and model are yours to define — see [creating an agent](https://docs.paradime.io/products/dino-ai/programmable-agents/quick-start). Two rules:
 
-The agent also honours rule files it finds in the checkout — `.dinorules`, `CLAUDE.md`, `AGENTS.md`, `.cursorrules` and `.cursor/rules/**`.
+- The agent must exist on your repository's **default branch**. The action checks there on purpose: a pull request cannot supply the reviewer that reviews it.
+- If no agent by that name exists, the action says so in the log and runs the built-in reviewer, so nothing breaks before you've created one. Set `agent: ""` to always use the built-in reviewer.
 
-Use `instructions` for per-workflow focus without touching the agent definition.
+Give a custom reviewer the terminal and file tools ([tools reference](https://docs.paradime.io/products/dino-ai/programmable-agents/tools-reference)) so it can diff the PR and report the commit it reviewed.
+
+The agent also honours rule files in the repository — `.dinorules`, `CLAUDE.md`, `AGENTS.md`, `.cursorrules` and `.cursor/rules/**`.
+
+Use `instructions` for per-workflow focus without changing the agent.
 
 ## Posting as "DinoAI" instead of github-actions[bot]
 
