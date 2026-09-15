@@ -155,7 +155,7 @@ def run() -> int:
         _notice(f"No .dinoai/agents/{_input('agent', 'pr-reviewer')}.yml on {ctx.default_branch or 'the default branch'}; "
                 "running the built-in reviewer. Add that file to customise it.")
 
-    client = ParadimeClient(_input("api_endpoint"), _input("api_key"), _input("api_secret"))
+    client = ParadimeClient(_input("api_endpoint"), _input("api_key"), _input("api_secret"), workspace_uid=_input("workspace_uid"))
     session_id, warning = client.trigger_run(
         message=message,
         agent=agent,
