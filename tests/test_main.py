@@ -12,7 +12,7 @@ from dinoai_action.paradime_api import RunState
 PR = {
     "number": 7, "title": "Add mart", "body": "", "draft": False, "html_url": "https://gh/acme/a/pull/7",
     "user": {"login": "dev"},
-    "base": {"sha": "b" * 40, "ref": "main", "repo": {"full_name": "acme/a"}},
+    "base": {"sha": "b" * 40, "ref": "main", "repo": {"full_name": "acme/a", "default_branch": "main"}},
     "head": {"sha": "c" * 40, "ref": "feat", "repo": {"full_name": "acme/a"}},
 }
 PATCH = "@@ -1,2 +1,3 @@\n select\n+  b,\n a\n"
@@ -26,7 +26,10 @@ class FakeGh:
         self.reviews_posted = []
         self.reviews = []
 
+    agent_files = set()
+
     def get_pull(self, repo, n): return PR
+    def file_exists(self, repo, path, ref): return (path, ref) in self.agent_files
     def list_pull_files(self, repo, n): return [{"filename": "m.sql", "additions": 1, "deletions": 0, "status": "modified", "patch": PATCH}]
     def list_reviews(self, repo, n): return self.reviews
     def list_review_comments(self, repo, n): return []
@@ -101,7 +104,7 @@ class RunTest(unittest.TestCase):
         code, gh, pd = self._run()
         self.assertEqual(code, 0)
         self.assertEqual(pd.trigger_kwargs["base_branch"], "c" * 40)
-        self.assertEqual(pd.trigger_kwargs["agent"], "pr-reviewer")
+        self.assertIsNone(pd.trigger_kwargs["agent"])  # no definition file → unnamed run
         self.assertIn("git diff " + "b" * 40 + "..." + "c" * 40, pd.trigger_kwargs["message"])
         self.assertEqual(len(gh.reviews_posted), 1)
         review = gh.reviews_posted[0]
@@ -117,6 +120,11 @@ class RunTest(unittest.TestCase):
         self.assertIn("findings_count", out)
         self.assertIn("\n2\n", raw)
         self.assertFalse(pd.stopped)
+
+    def test_named_agent_when_definition_exists_on_default_branch(self):
+        with mock.patch.object(FakeGh, "agent_files", {(".dinoai/agents/pr-reviewer.yml", "main")}):
+            _, _, pd = self._run()
+        self.assertEqual(pd.trigger_kwargs["agent"], "pr-reviewer")
 
     def test_fail_on_findings_requests_changes_and_fails(self):
         code, gh, _ = self._run({"INPUT_FAIL_ON_FINDINGS": "true"})

@@ -55,7 +55,7 @@ Three things worth knowing:
 
 ## Customising the reviewer
 
-The action runs the agent named by `agent` (default `pr-reviewer`), defined in `.dinoai/agents/pr-reviewer.yml` **on your default branch**. If the file is absent a built-in reviewer is used. The definition is read from the default branch on purpose: a PR cannot rewrite the reviewer that reviews it.
+The action runs the agent named by `agent` (default `pr-reviewer`), defined in `.dinoai/agents/pr-reviewer.yml` **on your default branch**. If that file doesn't exist the action says so in the log and runs an unnamed session with the built-in review prompt, so nothing breaks before you've written one. The action checks for the file on the default branch on purpose: a PR cannot supply the reviewer that reviews it.
 
 The agent also honours rule files it finds in the checkout — `.dinorules`, `CLAUDE.md`, `AGENTS.md`, `.cursorrules` and `.cursor/rules/**`.
 

@@ -11,6 +11,26 @@ _MAX_COMMENT_CHARS = 1500
 _MAX_DIFFSTAT_FILES = 300
 
 
+AGENT_DEFINITION_DIR = ".dinoai/agents"
+
+
+def resolve_agent(gh: GitHubClient, ctx: PullRequestContext, agent: str) -> str | None:
+    """The agent name to send, or None when its definition is absent.
+
+    An explicitly requested agent whose `.dinoai/agents/<name>.yml` does not exist fails the run
+    server-side, so check first and fall back to an unnamed run — the review prompt in the
+    message is enough on its own. The lookup is pinned to the default branch: a PR must not be
+    able to supply the reviewer that reviews it.
+    """
+    if not agent:
+        return None
+    ref = ctx.default_branch or "HEAD"
+    for suffix in (".yml", ".yaml"):
+        if gh.file_exists(ctx.repo, f"{AGENT_DEFINITION_DIR}/{agent}{suffix}", ref):
+            return agent
+    return None
+
+
 class SkipRun(Exception):
     """Raised when the event should not produce a run; the message is printed as a notice."""
 
@@ -29,6 +49,7 @@ class PullRequestContext:
     is_fork: bool
     author: str
     html_url: str
+    default_branch: str = ""
     task: str | None = None  # the request from a mention, when there is one
 
 
@@ -80,6 +101,7 @@ def _from_pull(repo: str, pr: dict) -> PullRequestContext:
         is_fork=bool(head_repo and head_repo != repo),
         author=(pr.get("user") or {}).get("login") or "",
         html_url=pr.get("html_url") or "",
+        default_branch=(base.get("repo") or {}).get("default_branch") or "",
     )
 
 

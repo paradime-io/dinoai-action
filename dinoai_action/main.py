@@ -139,10 +139,15 @@ def run() -> int:
         instructions=_input("instructions"),
     )
 
+    agent = ctx_mod.resolve_agent(gh, ctx, _input("agent", "pr-reviewer"))
+    if agent is None and _input("agent", "pr-reviewer"):
+        _notice(f"No .dinoai/agents/{_input('agent', 'pr-reviewer')}.yml on {ctx.default_branch or 'the default branch'}; "
+                "running the built-in reviewer. Add that file to customise it.")
+
     client = ParadimeClient(_input("api_endpoint"), _input("api_key"), _input("api_secret"))
     session_id, warning = client.trigger_run(
         message=message,
-        agent=_input("agent", "pr-reviewer") or None,
+        agent=agent,
         base_branch=ctx.head_sha,
         model_family=_input("model_family") or None,
     )

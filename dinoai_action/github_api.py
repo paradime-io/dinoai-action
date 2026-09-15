@@ -81,5 +81,14 @@ class GitHubClient:
         payload = {"commit_id": commit_id, "body": body, "event": event, "comments": comments}
         return self.post(f"/repos/{repo}/pulls/{number}/reviews", payload)  # type: ignore[return-value]
 
+    def file_exists(self, repo: str, path: str, ref: str) -> bool:
+        try:
+            self.get(f"/repos/{repo}/contents/{path}", params={"ref": ref})
+            return True
+        except GitHubApiError as e:
+            if e.status == 404:
+                return False
+            raise
+
     def create_issue_comment(self, repo: str, number: int, body: str) -> dict:
         return self.post(f"/repos/{repo}/issues/{number}/comments", {"body": body})  # type: ignore[return-value]
