@@ -304,16 +304,35 @@ def _ask_for_findings_block(client: ParadimeClient, session_id: str, *, already_
 
 
 def _post_review(gh: GitHubClient, ctx: ctx_mod.PullRequestContext, *, body: str, event: str, comments: list[dict]) -> None:
-    try:
-        gh.create_review(ctx.repo, ctx.number, commit_id=ctx.head_sha, body=body, event=event, comments=comments)
-        _log(f"Posted review with {len(comments)} inline comment(s)")
-    except GitHubApiError as e:
-        # 422 means a comment position GitHub would not accept (a file past the 300-file listing, a
-        # line the diff API elided). Better one review without inline placement than none at all.
-        if e.status != 422 or not comments:
-            raise
-        _warn(f"GitHub rejected the inline positions ({e}); posting the review without inline comments.")
-        gh.create_review(ctx.repo, ctx.number, commit_id=ctx.head_sha, body=body, event=event, comments=[])
+    """Post the review, degrading rather than dropping it when GitHub rejects the shape.
+
+    Ladder: as requested → same event without inline comments (a position GitHub would not
+    accept) → COMMENT with comments (REQUEST_CHANGES is refused when the token is the PR
+    author, e.g. automation-opened PRs) → COMMENT without comments. The step's exit code is
+    decided separately, so a downgraded event still fails the check when it should.
+    """
+    attempts = [(event, comments)]
+    if comments:
+        attempts.append((event, []))
+    if event != "COMMENT":
+        attempts.append(("COMMENT", comments))
+        if comments:
+            attempts.append(("COMMENT", []))
+    last: GitHubApiError | None = None
+    for i, (ev, cs) in enumerate(attempts):
+        try:
+            gh.create_review(ctx.repo, ctx.number, commit_id=ctx.head_sha, body=body, event=ev, comments=cs)
+            note = "" if i == 0 else f" (after GitHub rejected the requested shape: {last})"
+            _log(f"Posted review as {ev} with {len(cs)} inline comment(s){note}")
+            if i:
+                _warn(f"Review posted as {ev} with {len(cs)} inline comment(s); GitHub rejected the requested shape: {last}")
+            return
+        except GitHubApiError as e:
+            if e.status != 422:
+                raise
+            last = e
+    assert last is not None
+    raise last
 
 
 def main() -> None:

@@ -194,6 +194,46 @@ class IncrementalTest(RunTest):
         self.assertIn("Treat the findings with caution", review["body"])
 
 
+class PostReviewLadderTest(RunTest):
+    def test_request_changes_on_own_pr_downgrades_to_comment(self):
+        from dinoai_action.github_api import GitHubApiError
+
+        class OwnPrGh(FakeGh):
+            def create_review(self, repo, n, **kw):
+                if kw["event"] == "REQUEST_CHANGES":
+                    raise GitHubApiError(422, '{"errors":["Review Can not request changes on your own pull request"]}')
+                self.reviews_posted.append(kw)
+                return {"id": 1}
+
+        gh = OwnPrGh()
+        with mock.patch.dict(os.environ, {**self.env, "INPUT_FAIL_ON_FINDINGS": "true"}, clear=False), \
+             mock.patch.object(main, "GitHubClient", lambda *a, **k: gh), \
+             mock.patch.object(main, "ParadimeClient", FakeParadime), mock.patch.object(main.time, "sleep", lambda *_: None):
+            code = main.run()
+        self.assertEqual(code, 1)  # the gate still fails the step
+        self.assertEqual(len(gh.reviews_posted), 1)
+        self.assertEqual(gh.reviews_posted[0]["event"], "COMMENT")
+        self.assertEqual(len(gh.reviews_posted[0]["comments"]), 1)  # inline comments kept
+
+    def test_bad_position_drops_comments_only(self):
+        from dinoai_action.github_api import GitHubApiError
+
+        class BadPosGh(FakeGh):
+            def create_review(self, repo, n, **kw):
+                if kw["comments"]:
+                    raise GitHubApiError(422, "line must be part of the diff")
+                self.reviews_posted.append(kw)
+                return {"id": 1}
+
+        gh = BadPosGh()
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(main, "GitHubClient", lambda *a, **k: gh), \
+             mock.patch.object(main, "ParadimeClient", FakeParadime), mock.patch.object(main.time, "sleep", lambda *_: None):
+            code = main.run()
+        self.assertEqual(code, 0)
+        self.assertEqual(gh.reviews_posted[0]["event"], "COMMENT")
+        self.assertEqual(gh.reviews_posted[0]["comments"], [])
+
+
 class FollowUpTest(RunTest):
     """When the final message has no block, one follow-up on the same session should fetch it."""
 
