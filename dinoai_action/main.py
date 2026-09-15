@@ -255,6 +255,7 @@ def run() -> int:
         session_id=session_id,
         session_url=session_url,
         structured=structured,
+        reviewed=state.status == "completed",
     )
     _set_output("findings_count", str(len(findings)))
     _set_output("review_body", body)

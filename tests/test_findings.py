@@ -123,3 +123,19 @@ class MarkerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MarkerOnlyWhenReviewedTest(unittest.TestCase):
+    """A failed run must not claim the commit was reviewed."""
+
+    def _body(self, reviewed):
+        return render_review_body(summary="s", overflow=[], inline_count=0, status="completed" if reviewed else "failed",
+                                  head_sha="a" * 40, session_id="s1", session_url=None, reviewed=reviewed)
+
+    def test_completed_run_stamps_the_marker(self):
+        self.assertIn("<!-- dinoai-review head=", self._body(True))
+
+    def test_failed_run_does_not(self):
+        body = self._body(False)
+        self.assertNotIn("<!-- dinoai-review head=", body)
+        self.assertEqual(find_previous_reviews([{"id": 1, "submitted_at": "x", "body": body}]), (None, set()))

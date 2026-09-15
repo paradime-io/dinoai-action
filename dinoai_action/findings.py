@@ -168,6 +168,7 @@ def render_review_body(
     session_id: str,
     session_url: str | None,
     structured: bool = True,
+    reviewed: bool = True,
 ) -> str:
     total = inline_count + len(overflow)
     if not structured:
@@ -184,7 +185,11 @@ def render_review_body(
     if session_url:
         footer.append(f"[View in Paradime]({session_url})")
     parts.append("<sub>" + " · ".join(footer) + "</sub>")
-    parts.append(REVIEW_MARKER.format(head_sha=head_sha, session_id=session_id))
+    # The marker is what a later run reads as "this commit was reviewed". A run that failed or
+    # was stopped never looked at the tree, so stamping it would make the next push diff from a
+    # commit nobody reviewed and skip whatever changed in between.
+    if reviewed:
+        parts.append(REVIEW_MARKER.format(head_sha=head_sha, session_id=session_id))
     return "\n\n".join(parts)
 
 
