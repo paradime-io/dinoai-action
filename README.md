@@ -78,6 +78,8 @@ The agent also honours rule files in the repository — `.dinorules`, `CLAUDE.md
 
 Use `instructions` for per-workflow focus without changing the agent.
 
+Not sure where to find a slug, or seeing *"agent not found"* in the log? See the [Programmable Agents FAQ](https://docs.paradime.io/products/dino-ai/programmable-agents/faq).
+
 ## Posting as "DinoAI" instead of github-actions[bot]
 
 The review is authored by whichever token posts it. The default `${{ github.token }}` shows as **github-actions[bot]**. To have reviews appear under a DinoAI identity with its own name and avatar, install a GitHub App for it and mint a token in the workflow — no user account or seat needed:
@@ -156,6 +158,13 @@ Stdlib-only Python; no build step, nothing to bundle.
 ```
 python -m unittest discover -s tests -v
 ```
+
+## Documentation
+
+- [Programmable Agents](https://docs.paradime.io/products/dino-ai/programmable-agents) — what an agent is and how to build one
+- [Programmable Agents FAQ](https://docs.paradime.io/products/dino-ai/programmable-agents/faq) — slugs, where agents live, agent-not-found
+- [API keys](https://docs.paradime.io/developers/api-keys) — account keys and workspace tokens
+- [PR reviewer guide](https://docs.paradime.io/guides/programmable-agents/github-action-pr-reviewer) — configuring the agent behind this Action
 
 ## License
 
