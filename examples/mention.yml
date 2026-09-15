@@ -21,5 +21,6 @@ jobs:
           api_endpoint: ${{ secrets.PARADIME_API_ENDPOINT }}
           api_key: ${{ secrets.PARADIME_API_KEY }}            # Account API key (prdm_cmp_…)
           workspace_uid: ${{ vars.PARADIME_WORKSPACE_UID }}   # workspace token for this repo
+          # agent: my-pr-reviewer                            # your own agent; omit for the built-in reviewer
           mode: mention
           trigger_phrase: "@dinoai"

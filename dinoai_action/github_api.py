@@ -84,14 +84,5 @@ class GitHubClient:
     def compare(self, repo: str, base: str, head: str) -> dict:
         return self.get(f"/repos/{repo}/compare/{base}...{head}")  # type: ignore[return-value]
 
-    def file_exists(self, repo: str, path: str, ref: str) -> bool:
-        try:
-            self.get(f"/repos/{repo}/contents/{path}", params={"ref": ref})
-            return True
-        except GitHubApiError as e:
-            if e.status == 404:
-                return False
-            raise
-
     def create_issue_comment(self, repo: str, number: int, body: str) -> dict:
         return self.post(f"/repos/{repo}/issues/{number}/comments", {"body": body})  # type: ignore[return-value]

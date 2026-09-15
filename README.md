@@ -66,19 +66,22 @@ Workspace key/secret pairs (`X-API-KEY` / `X-API-SECRET`) still work: pass the k
 
 ## Customising the reviewer
 
-The action runs the [Programmable Agent](https://docs.paradime.io/products/dino-ai/programmable-agents) whose **slug** you pass as `agent` (default `pr-reviewer`), so the reviewer's role, instructions, tools and model are yours to define — see [creating an agent](https://docs.paradime.io/products/dino-ai/programmable-agents/quick-start). Two rules:
+Out of the box the action uses a built-in reviewer, so it works before you have set anything up. To review with your own [Programmable Agent](https://docs.paradime.io/products/dino-ai/programmable-agents) — your role, instructions, tools and model — name it in the workflow:
 
-- Pass the agent's **slug**, not its display name. The slug is minted from the name when the agent is created and never changes, so renaming an agent in the app does not break the workflow.
-- The agent must exist on your repository's **default branch**. The action checks there on purpose: a pull request cannot supply the reviewer that reviews it.
-- If no agent by that name exists, the action says so in the log and runs the built-in reviewer, so nothing breaks before you've created one. Set `agent: ""` to always use the built-in reviewer.
+```yaml
+    agent: my-pr-reviewer
+```
 
-Give a custom reviewer the terminal and file tools ([tools reference](https://docs.paradime.io/products/dino-ai/programmable-agents/tools-reference)) so it can diff the PR and report the commit it reviewed.
+- Agents **built in the app** and agents **written as YAML** under `.dinoai/agents/` both work; Paradime resolves the name for you.
+- For an app-built agent, use **the name you gave it** (its slug also works). For a YAML agent, use the file name without the extension.
+- YAML agents are read from your repository's **default branch**, never from the pull request, so a PR cannot supply the reviewer that reviews it.
+- Give a custom reviewer the terminal and file tools ([tools reference](https://docs.paradime.io/products/dino-ai/programmable-agents/tools-reference)) so it can diff the PR and report the commit it reviewed.
+
+If the name matches no agent, the run fails and says so rather than quietly reviewing with something else. The [Programmable Agents FAQ](https://docs.paradime.io/products/dino-ai/programmable-agents/faq) covers what to check.
 
 The agent also honours rule files in the repository — `.dinorules`, `CLAUDE.md`, `AGENTS.md`, `.cursorrules` and `.cursor/rules/**`.
 
 Use `instructions` for per-workflow focus without changing the agent.
-
-Not sure where to find a slug, or seeing *"agent not found"* in the log? See the [Programmable Agents FAQ](https://docs.paradime.io/products/dino-ai/programmable-agents/faq).
 
 ## Posting as "DinoAI" instead of github-actions[bot]
 
@@ -112,7 +115,7 @@ Credentials follow [Paradime's API keys guide](https://docs.paradime.io/develope
 | `workspace_uid` | `""` | Workspace token the reviews run in. Required with an Account API key. |
 | `api_secret` | `""` | Legacy only: the secret of a workspace key/secret pair. Not needed with an Account API key. |
 | `github_token` | `${{ github.token }}` | Needs `pull-requests: write` to post. |
-| `agent` | `pr-reviewer` | Slug of the Programmable Agent to run. |
+| `agent` | `""` | Agent to run, by the name you gave it in Paradime. Empty uses the built-in reviewer. |
 | `instructions` | `""` | Extra instructions appended to the prompt. |
 | `model_family` | `""` | A model family enabled in your workspace. |
 | `mode` | `review` | `review` for `pull_request` events, `mention` for comment events. |
