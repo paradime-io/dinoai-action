@@ -6,8 +6,8 @@ The agent does not run in your CI runner. It runs in your Paradime workspace, wi
 
 ## Quick start
 
-1. In Paradime, create a workspace API key with the `dinoai:agent:trigger` and `dinoai:agent:read` capabilities. Note the API endpoint shown next to it. (A company-level key works too — then also pass `workspace_uid`.)
-2. Add `PARADIME_API_ENDPOINT` and `PARADIME_API_KEY` as repository secrets.
+1. In Paradime, **Settings → API Keys → Generate API Key** with the **DinoAI agent API** capability. Note the endpoint shown with it (`https://api.paradime.io/api/v1/<company_token>/graphql`) and the workspace token of the workspace connected to this repository.
+2. Add `PARADIME_API_ENDPOINT` and `PARADIME_API_KEY` as secrets (organisation-level works — one key can serve every repository), and `PARADIME_WORKSPACE_UID` as a repository variable.
 3. Add a workflow:
 
 ```yaml
@@ -25,7 +25,8 @@ jobs:
       - uses: paradime-io/dinoai-action@v1
         with:
           api_endpoint: ${{ secrets.PARADIME_API_ENDPOINT }}
-          api_key: ${{ secrets.PARADIME_API_KEY }}
+          api_key: ${{ secrets.PARADIME_API_KEY }}            # prdm_cmp_… Account API key
+          workspace_uid: ${{ vars.PARADIME_WORKSPACE_UID }}   # which workspace reviews run in
 ```
 
 Open a PR that touches your dbt project. A review appears when the agent finishes.
@@ -53,6 +54,14 @@ Three things worth knowing:
 - **Re-runs are incremental.** On a new push the agent gets the exact changes since its last review (from GitHub's compare API), the list of what it already reported, and an instruction to re-read those files at head — so it reviews the delta and says what's fixed instead of repeating itself. Set `incremental: "false"` to always review the whole PR.
 - **The tree is verified.** The agent reports `git rev-parse HEAD` in its findings block. If that isn't the PR head, the review is posted with a warning and no inline findings rather than passing off a review of the wrong commit.
 - **The review is posted with your workflow token**, as `github-actions[bot]`. Paradime's GitHub App needs no extra permissions for this action to work.
+
+### One key, many repositories
+
+An Account API key spans workspaces, so keep it once as an **organisation secret** and give each repository its own workspace token as a **repository variable** (`vars.PARADIME_WORKSPACE_UID`). Nothing secret lives per repository.
+
+### Legacy workspace keys
+
+Workspace key/secret pairs (`X-API-KEY` / `X-API-SECRET`) still work: pass the key as `api_key` and the secret as `api_secret`, and leave `workspace_uid` empty — the key is already bound to its workspace. Paradime documents these as legacy; prefer an Account API key for new setups.
 
 ## Customising the reviewer
 
@@ -85,10 +94,10 @@ The App needs only `Pull requests: Read & write` and `Contents: Read`, and no we
 
 | Input | Default | Notes |
 |---|---|---|
-| `api_endpoint` | — | Paradime API endpoint (GraphQL URL). Required. |
-| `api_key` | — | Workspace API key (`prdm_wsp_…`). Required. |
-| `api_secret` | `""` | Only for legacy key/secret pairs. |
-| `workspace_uid` | `""` | Required with a company key (`prdm_cmp_…`). Workspace keys already know their workspace. |
+| `api_endpoint` | — | `https://api.paradime.io/api/v1/<company_token>/graphql`, shown when the key is generated. Required. |
+| `api_key` | — | Account API key (`prdm_cmp_…`) with the DinoAI agent API capability. Required. |
+| `workspace_uid` | `""` | Workspace token the reviews run in. Required with an Account API key. |
+| `api_secret` | `""` | Legacy only: the secret of a workspace key/secret pair. Not needed with an Account API key. |
 | `github_token` | `${{ github.token }}` | Needs `pull-requests: write` to post. |
 | `agent` | `pr-reviewer` | Agent definition name. |
 | `instructions` | `""` | Extra instructions appended to the prompt. |

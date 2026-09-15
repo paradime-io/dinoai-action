@@ -62,18 +62,20 @@ class ParadimeClient:
             raise ParadimeApiError("api_endpoint must be an https:// URL")
         self.endpoint = endpoint
         self.retries = retries
-        # Bearer is the current scheme; a key/secret pair is the legacy one. Both stay supported
-        # server-side, so honour whichever the caller configured.
+        # Account API keys (prdm_cmp_…) are the documented scheme: a bearer token plus the
+        # target workspace in X-Paradime-Workspace on every request. The legacy workspace
+        # key/secret pair is bound to one workspace and stays supported server-side.
         if api_secret:
             self._headers = {"X-API-KEY": api_key, "X-API-SECRET": api_secret}
         else:
             self._headers = {"Authorization": f"Bearer {api_key}"}
-        # Workspace keys are bound to one workspace. Company keys (prdm_cmp_…) span several and
-        # must name the target on every request.
         if workspace_uid:
             self._headers["X-Paradime-Workspace"] = workspace_uid
         elif api_key.startswith("prdm_cmp_"):
-            raise ParadimeApiError("A company API key (prdm_cmp_…) needs `workspace_uid` to say which workspace to run in.")
+            raise ParadimeApiError(
+                "An Account API key (prdm_cmp_…) spans workspaces: set `workspace_uid` to the workspace "
+                "token the reviews should run in."
+            )
 
     def _gql(self, query: str, variables: dict) -> dict:
         body = json.dumps({"query": query, "variables": variables}).encode()

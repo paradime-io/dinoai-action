@@ -20,7 +20,8 @@ jobs:
       - uses: paradime-io/dinoai-action@v1
         with:
           api_endpoint: ${{ secrets.PARADIME_API_ENDPOINT }}
-          api_key: ${{ secrets.PARADIME_API_KEY }}
+          api_key: ${{ secrets.PARADIME_API_KEY }}            # Account API key (prdm_cmp_…)
+          workspace_uid: ${{ vars.PARADIME_WORKSPACE_UID }}   # workspace token for this repo
           # agent: pr-reviewer            # .dinoai/agents/pr-reviewer.yml on your default branch
           # model_family: standard        # any family enabled in your workspace
           # fail_on_findings: "true"      # make this a merge gate

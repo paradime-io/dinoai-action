@@ -7,17 +7,17 @@ branding:
 
 inputs:
   api_endpoint:
-    description: "Paradime API endpoint (Settings → API keys). A GraphQL URL."
+    description: "Paradime API endpoint shown when you generate the key: https://api.paradime.io/api/v1/<company_token>/graphql"
     required: true
   api_key:
-    description: "Paradime workspace API key. A `prdm_wsp_…` bearer token, or the legacy key when `api_secret` is also set. Needs `dinoai:agent:trigger` and `dinoai:agent:read`."
+    description: "Paradime Account API key (prdm_cmp_…) from Settings → API Keys, with the DinoAI agent API capability. Sent as a bearer token."
     required: true
-  api_secret:
-    description: "Legacy API secret. Only set this for key/secret pairs; leave empty for bearer tokens."
+  workspace_uid:
+    description: "The workspace token the reviews run in (sent as X-Paradime-Workspace). Required with an Account API key. Set it per repository, e.g. from a repository variable."
     required: false
     default: ""
-  workspace_uid:
-    description: "Workspace to run in. Required with a company API key (prdm_cmp_…); ignored for workspace keys, which are bound to one workspace already."
+  api_secret:
+    description: "Legacy only. Secret half of a legacy workspace key/secret pair; when set, api_key is sent as X-API-KEY and this as X-API-SECRET, and workspace_uid is not needed. Prefer an Account API key."
     required: false
     default: ""
   github_token:
