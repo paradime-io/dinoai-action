@@ -32,6 +32,19 @@ class Finding:
         return _SEVERITY_RANK.get(self.severity, len(SEVERITIES))
 
 
+def parse_reviewed_head(text: str) -> str | None:
+    """The `reviewed_head` the agent reported in its findings block, if any."""
+    for match in _FENCE_RE.finditer(text):
+        try:
+            data = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and "findings" in data:
+            head = str(data.get("reviewed_head") or "").strip()
+            return head or None
+    return None
+
+
 def parse_findings(text: str) -> tuple[str, list[Finding], bool]:
     """Split the agent's final message into (summary, findings, structured).
 

@@ -81,6 +81,9 @@ class GitHubClient:
         payload = {"commit_id": commit_id, "body": body, "event": event, "comments": comments}
         return self.post(f"/repos/{repo}/pulls/{number}/reviews", payload)  # type: ignore[return-value]
 
+    def compare(self, repo: str, base: str, head: str) -> dict:
+        return self.get(f"/repos/{repo}/compare/{base}...{head}")  # type: ignore[return-value]
+
     def file_exists(self, repo: str, path: str, ref: str) -> bool:
         try:
             self.get(f"/repos/{repo}/contents/{path}", params={"ref": ref})

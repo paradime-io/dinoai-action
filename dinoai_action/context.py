@@ -152,6 +152,30 @@ def already_reported(review_comments: list[dict], *, review_ids: set[int]) -> st
     return "\n".join(rows[-50:])
 
 
+_MAX_PATCH_LINES = 60
+
+
+def changes_since(compare: dict) -> str:
+    """The increment as evidence: per-file stat plus a bounded patch excerpt.
+
+    The PR-wide diffstat can look unchanged between two pushes (a new file is still "+N")
+    while its content moved; without this block the agent has to notice that on its own."""
+    files = compare.get("files") or []
+    if not files:
+        return "(no file changes between the last reviewed commit and head)"
+    rows = []
+    for f in files[:50]:
+        rows.append(f"{f.get('filename')} | +{f.get('additions', 0)} -{f.get('deletions', 0)} {f.get('status', '')}")
+        patch = f.get("patch")
+        if patch:
+            lines = patch.splitlines()
+            shown = lines[:_MAX_PATCH_LINES]
+            rows.extend("    " + ln for ln in shown)
+            if len(lines) > len(shown):
+                rows.append(f"    … {len(lines) - len(shown)} more patch lines")
+    return "\n".join(rows)
+
+
 def _clip(text: str) -> str:
     text = " ".join(text.split())
     return text if len(text) <= _MAX_COMMENT_CHARS else text[:_MAX_COMMENT_CHARS] + "…"
@@ -165,14 +189,16 @@ def build_message(
     already_reported_text: str,
     last_reviewed_sha: str | None,
     instructions: str,
+    changes_since_text: str = "",
 ) -> str:
     """The single message the agent receives. Coordinates and a diffstat, never the diff:
     the pod has the whole repository checked out at head_sha and computes hunks itself."""
     scope = (
-        f"This is a re-review. Your last review was at commit {last_reviewed_sha}. Review only what changed "
-        f"since then (`git diff {last_reviewed_sha}...{ctx.head_sha}`), using the full PR diff "
-        f"(`git diff {ctx.base_sha}...{ctx.head_sha}`) for context. Do not repeat findings listed under "
-        "<already_reported>; note whether each is fixed or still open."
+        f"This is a re-review. Your last review was at commit {last_reviewed_sha}. The changes since then are in "
+        f"<changes_since_last_review>; run `git diff {last_reviewed_sha}...{ctx.head_sha}` to see them in full and "
+        f"`git diff {ctx.base_sha}...{ctx.head_sha}` for whole-PR context. For every item in <already_reported>, "
+        "re-read the file at the head commit and judge fixed/still-open from its CURRENT content — the earlier report "
+        "may be stale. Report only new findings and status changes; do not re-post unchanged ones."
         if last_reviewed_sha and last_reviewed_sha != ctx.head_sha
         else f"Review the full pull request: `git diff {ctx.base_sha}...{ctx.head_sha}` (three-dot, merge-base semantics — this is what GitHub shows)."
     )
@@ -182,11 +208,12 @@ def build_message(
         "Only your FINAL message is delivered to the pull request; nothing you \"post below\" or send separately exists to the reader.",
         "Your final message MUST end with exactly one fenced block labelled `dinoai-findings` containing JSON of this shape:",
         "```dinoai-findings",
-        '{"summary": "<markdown summary for the review body>",',
+        '{"reviewed_head": "<output of `git rev-parse HEAD` in your checkout>",',
+        ' "summary": "<markdown summary for the review body>",',
         ' "findings": [{"path": "models/marts/orders.sql", "line": 42, "severity": "high",',
         '               "title": "Join fans out on order_id", "body": "<markdown explanation>", "suggestion": "<optional drop-in replacement for that one line>"}]}',
         "```",
-        "Rules: `path` is repo-relative; `line` is the line number on the head commit and must be a line that is part of the diff; "
+        "Rules: run `git rev-parse HEAD` first and copy it into `reviewed_head` — it proves which tree you reviewed; `path` is repo-relative; `line` is the line number on the head commit and must be a line that is part of the diff; "
         "severity is critical|high|medium|low|info; use an empty findings list when there is nothing to report; "
         "only include a suggestion when it is a complete replacement for the referenced line. Put the block last, after any prose.",
         "</output_format>",
@@ -214,6 +241,8 @@ def build_message(
     ]
     if comments_text:
         parts += ["", "<pr_comments>", comments_text, "</pr_comments>"]
+    if changes_since_text:
+        parts += ["", "<changes_since_last_review>", changes_since_text, "</changes_since_last_review>"]
     if already_reported_text:
         parts += ["", "<already_reported>", already_reported_text, "</already_reported>"]
     parts += [

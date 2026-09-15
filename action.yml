@@ -86,6 +86,9 @@ outputs:
   review_body:
     description: "The review summary the agent wrote (markdown)."
     value: ${{ steps.run.outputs.review_body }}
+  reviewed_head:
+    description: "The commit the agent reported reviewing (from its findings block); empty if it did not say."
+    value: ${{ steps.run.outputs.reviewed_head }}
   structured:
     description: "Whether the agent returned a parseable findings block (true/false)."
     value: ${{ steps.run.outputs.structured }}

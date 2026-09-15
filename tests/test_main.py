@@ -16,7 +16,7 @@ PR = {
     "head": {"sha": "c" * 40, "ref": "feat", "repo": {"full_name": "acme/a"}},
 }
 PATCH = "@@ -1,2 +1,3 @@\n select\n+  b,\n a\n"
-FINAL = ('Done.\n```dinoai-findings\n{"summary": "One issue.", "findings": [{"path": "m.sql", "line": 2, '
+FINAL = ('Done.\n```dinoai-findings\n{"reviewed_head": "' + "c" * 40 + '", "summary": "One issue.", "findings": [{"path": "m.sql", "line": 2, '
          '"severity": "high", "title": "Fan-out", "body": "join multiplies", "suggestion": "  b -- fixed,"}, '
          '{"path": "m.sql", "line": 999, "severity": "low", "title": "Off-diff", "body": "x"}]}\n```')
 
@@ -30,6 +30,7 @@ class FakeGh:
 
     def get_pull(self, repo, n): return PR
     def file_exists(self, repo, path, ref): return (path, ref) in self.agent_files
+    def compare(self, repo, base, head): return {"files": [{"filename": "m.sql", "additions": 1, "deletions": 1, "status": "modified", "patch": "@@ -2,1 +2,1 @@\n-old\n+new"}]}
     def list_pull_files(self, repo, n): return [{"filename": "m.sql", "additions": 1, "deletions": 0, "status": "modified", "patch": PATCH}]
     def list_reviews(self, repo, n): return self.reviews
     def list_review_comments(self, repo, n): return []
@@ -164,6 +165,33 @@ class RunTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IncrementalTest(RunTest):
+    def test_second_push_gets_changes_since_block(self):
+        old = [{"id": 3, "submitted_at": "2026-01-01T00:00:00Z", "body": "<!-- dinoai-review head=" + "a" * 40 + " session=s0 -->"}]
+        with mock.patch.object(FakeGh, "list_reviews", lambda self, r, n: old):
+            code, gh, pd = self._run()
+        self.assertEqual(code, 0)
+        msg = pd.trigger_kwargs["message"]
+        self.assertIn("<changes_since_last_review>", msg)
+        self.assertIn("+new", msg)
+        self.assertIn("re-read the file at the head commit", msg)
+
+    def test_wrong_tree_is_flagged_and_findings_dropped(self):
+        wrong = FINAL.replace("c" * 40, "d" * 40)
+        class WrongTree(FakeParadime):
+            def read_run(self, sid):
+                return RunState(status="completed", messages=[{"role": "agent", "content": wrong}])
+        with mock.patch.object(main, "ParadimeClient", WrongTree), mock.patch.object(main.time, "sleep", lambda *_: None), \
+             mock.patch.dict(os.environ, self.env, clear=False):
+            gh = FakeGh()
+            with mock.patch.object(main, "GitHubClient", lambda *a, **k: gh):
+                code = main.run()
+        self.assertEqual(code, 0)
+        review = gh.reviews_posted[0]
+        self.assertEqual(review["comments"], [])
+        self.assertIn("Treat the findings with caution", review["body"])
 
 
 class FollowUpTest(RunTest):

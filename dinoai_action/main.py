@@ -14,6 +14,7 @@ from .findings import (
     commentable_lines,
     find_previous_reviews,
     parse_findings_from_messages,
+    parse_reviewed_head,
     partition,
     render_comment,
     render_review_body,
@@ -130,8 +131,18 @@ def run() -> int:
         _notice(f"Head {ctx.head_sha[:12]} was already reviewed; nothing new to review.")
         return 0
 
+    changes_since_text = ""
+    if last_sha and last_sha != ctx.head_sha:
+        try:
+            changes_since_text = ctx_mod.changes_since(gh.compare(ctx.repo, last_sha, ctx.head_sha))
+        except GitHubApiError as e:
+            # A force-push can orphan the old SHA; fall back to a full review rather than guess.
+            _warn(f"Could not compare {last_sha[:12]}...{ctx.head_sha[:12]} ({e.status}); reviewing the whole PR.")
+            last_sha = None
+
     message = ctx_mod.build_message(
         ctx,
+        changes_since_text=changes_since_text,
         diffstat_text=ctx_mod.diffstat(files),
         comments_text=ctx_mod.comments_block(issue_comments, review_comments, skip_marker="<!-- dinoai-review "),
         already_reported_text=ctx_mod.already_reported(review_comments, review_ids=our_review_ids),
@@ -216,6 +227,21 @@ def run() -> int:
     elif not structured:
         _warn("The agent did not return a structured findings block; posting its message as the summary only.")
     _set_output("structured", "true" if structured else "false")
+
+    reviewed_head = next((h for h in (parse_reviewed_head(t) for t in reversed(state.agent_messages())) if h), None)
+    _set_output("reviewed_head", reviewed_head or "")
+    tree_note = ""
+    if reviewed_head and not ctx.head_sha.startswith(reviewed_head) and not reviewed_head.startswith(ctx.head_sha[:7]):
+        # The pod falls back to the default branch when a ref is missing from its clone; that must
+        # never pass silently as a review of this PR.
+        _warn(f"The agent reviewed {reviewed_head[:12]}, not the PR head {ctx.head_sha[:12]}. Its findings may not apply.")
+        tree_note = (f"> ⚠️ The agent reported reviewing commit `{reviewed_head[:12]}`, but this PR's head is "
+                     f"`{ctx.head_sha[:12]}`. Treat the findings with caution and re-run.")
+        findings = []
+    elif not reviewed_head and structured:
+        _log("The agent did not report reviewed_head; cannot prove which tree it reviewed.")
+    if tree_note:
+        summary = tree_note + "\n\n" + summary
 
     inline, overflow = partition(findings, commentable_lines(files), _int("max_findings", 25))
     session_url = _input("session_url_template").replace("{agent_session_id}", session_id) or None
