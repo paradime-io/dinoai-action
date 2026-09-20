@@ -2,7 +2,7 @@
 
 Review pull requests with [Paradime](https://www.paradime.io)'s DinoAI background agent and get the findings back as an inline PR review.
 
-The agent does not run in your CI runner. It runs in your Paradime workspace, with the repository checked out at the PR's head commit **and** everything else the workspace already has: your warehouse connection, dbt, the catalog, column-level lineage and Bolt run history. So it can answer the questions a diff can't — does this join fan out, what breaks three models downstream, is the new column mostly null in production — and it posts the answer where the code is.
+The agent does not run in your CI runner. It runs in your Paradime workspace, with the repository checked out at the PR's head commit **and** everything else the workspace already has: your warehouse connection, dbt™, the catalog, column-level lineage and Bolt run history. So it can answer the questions a diff can't — does this join fan out, what breaks three models downstream, is the new column mostly null in production — and it posts the answer where the code is.
 
 ## Quick start
 
@@ -29,7 +29,7 @@ jobs:
           workspace_uid: ${{ vars.PARADIME_WORKSPACE_UID }}   # which workspace reviews run in
 ```
 
-Open a PR that touches your dbt project. A review appears when the agent finishes.
+Open a PR that touches your dbt™ project. A review appears when the agent finishes.
 
 See [`examples/`](examples/) for the mention-driven variant (`@dinoai <question>` in a PR comment).
 
@@ -40,7 +40,7 @@ pull_request event ──▶ action builds a context block ──▶ triggerDino
                         (coordinates + diffstat,                     │
                          PR comments, prior findings)                ▼
                                                         agent pod: full clone, checks out head SHA,
-                                                        git diff base...head, dbt, warehouse, lineage
+                                                        git diff base...head, dbt™, warehouse, lineage
                                                                      │
 action polls dinoaiAgentRun ◀────────────────────────────────────────┘
         │
