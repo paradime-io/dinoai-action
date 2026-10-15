@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "expired", "stopped"})
+USER_AGENT = "paradime-dinoai-action"
 
 _TRIGGER = """
 mutation Trigger($agent: String, $message: String, $baseBranch: String, $modelFamily: String) {
@@ -41,6 +43,32 @@ mutation Stop($id: String!) {
 
 class ParadimeApiError(RuntimeError):
     pass
+
+
+def _refused_message(endpoint: str, e: urllib.error.HTTPError) -> str:
+    # The Paradime API reports a bad, expired or under-scoped key as a GraphQL error on HTTP 200,
+    # never as 401/403, so a 401/403 here never means "check the key". Paradime's firewall answers
+    # 403 with `Blocked-By: AWS-WAF` when the body looks like an attack, which the PR text in the
+    # trigger message can (a relative path with `../`). Anything else was sent by a proxy or firewall
+    # on the runner's network, or by a host that is not the Paradime API. Say what answered.
+    host = urllib.parse.urlsplit(endpoint).netloc
+    headers = e.headers or {}
+    if "aws-waf" in (headers.get("Blocked-By") or "").lower():
+        return (
+            f"Paradime's firewall blocked the request to {host} (HTTP {e.code}). It most likely matched text from "
+            "this pull request: a relative path with `../` in the title, description or a comment is the usual "
+            "trigger. Remove it, then start a new run; re-running this job replays the original event with the old "
+            "text. If there is no `../`, contact Paradime support."
+        )
+    server = headers.get("Server")
+    body = " ".join(e.read().decode(errors="replace").split())[:300]
+    return (
+        f"The request to {host} got HTTP {e.code}" + (f" (server: {server})" if server else "") + ". "
+        "The Paradime API reports a bad API key as an error message, not as HTTP 401 or 403, so this response "
+        "most likely came from a proxy or firewall between this runner and Paradime, or api_endpoint is not "
+        f"the API Endpoint shown with your key. Check api_endpoint and that this runner can reach {host}."
+        + (f" Response: {body}" if body else "")
+    )
 
 
 @dataclass
@@ -79,7 +107,7 @@ class ParadimeClient:
 
     def _gql(self, query: str, variables: dict) -> dict:
         body = json.dumps({"query": query, "variables": variables}).encode()
-        headers = {"Content-Type": "application/json", "Accept": "application/json", **self._headers}
+        headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": USER_AGENT, **self._headers}
         last_error: Exception | None = None
         for attempt in range(self.retries):
             req = urllib.request.Request(self.endpoint, data=body, headers=headers, method="POST")
@@ -89,10 +117,7 @@ class ParadimeClient:
                 break
             except urllib.error.HTTPError as e:
                 if e.code in (401, 403):
-                    raise ParadimeApiError(
-                        f"Paradime API rejected the credentials (HTTP {e.code}). Check api_key and that "
-                        "it has the dinoai:agent:trigger and dinoai:agent:read capabilities."
-                    ) from e
+                    raise ParadimeApiError(_refused_message(self.endpoint, e)) from e
                 if e.code < 500 or attempt == self.retries - 1:
                     raise ParadimeApiError(f"Paradime API HTTP {e.code}: {e.read().decode(errors='replace')[:500]}") from e
                 last_error = e
