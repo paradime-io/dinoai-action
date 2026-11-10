@@ -140,7 +140,7 @@ Set `fail_on_findings: "true"` and make the job a required status check. The rev
 ## Limitations
 
 - **Fork PRs are not reviewed.** The agent reviews the base repository's clone, where a fork's commits don't exist — and GitHub doesn't expose secrets to fork PRs anyway. The action skips with a warning (or fails, if `fail_on_findings` is set).
-- **Cancellation.** Cancelling the workflow sends the step a signal; the action stops the agent session on the way out. If the runner itself dies, the session is released by Paradime's inactivity timeout.
+- **Cancellation.** Cancelling the workflow, including a newer push with `cancel-in-progress: true`, sends the step a signal, and the action stops the agent session on the way out. If the runner itself dies before it can do that, the session runs in Paradime until it finishes.
 - **GitHub Enterprise Server** is supported through the runner's `GITHUB_API_URL`.
 - Only lines that are part of the diff can carry an inline comment (a GitHub rule). Findings on other lines are listed in the review summary instead.
 
