@@ -122,4 +122,6 @@ runs:
         INPUT_POLL_INTERVAL_SECONDS: ${{ inputs.poll_interval_seconds }}
         INPUT_SESSION_URL_TEMPLATE: ${{ inputs.session_url_template }}
         PYTHONPATH: ${{ github.action_path }}
-      run: python3 -m dinoai_action.main
+      # `exec` makes Python the step's process. Without it bash is, and bash does not pass
+      # GitHub's cancel signal on to its child, so the agent session in Paradime is never stopped.
+      run: exec python3 -m dinoai_action.main
